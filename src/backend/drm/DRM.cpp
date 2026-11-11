@@ -644,10 +644,19 @@ void Aquamarine::CDRMBackend::restoreAfterVT() {
             .hdrMetadata   = STATE.hdrMetadata,
         };
 
+        // the kernel / fbcon may have re-lit this crtc while we were away, so a disabled
+        // output must be explicitly turned off again instead of being skipped.
+        if (!STATE.enabled) {
+            backend->log(AQ_LOG_DEBUG, std::format("drm: Disabling crtc {} for disabled output {}", c->crtc->id, c->szName));
+            if (!impl->commit(c, data))
+                backend->log(AQ_LOG_ERROR, std::format("drm: crtc {} failed to disable on restore", c->crtc->id));
+            continue;
+        }
+
         auto& MODE = STATE.customMode ? STATE.customMode : STATE.mode;
 
         if (!MODE) {
-            backend->log(AQ_LOG_WARNING, "drm: Connector {} has output but state has no mode, will send a reset state event later.");
+            backend->log(AQ_LOG_WARNING, std::format("drm: Connector {} has output but state has no mode, will send a reset state event later.", c->szName));
             noMode.emplace_back(c);
             continue;
         }
